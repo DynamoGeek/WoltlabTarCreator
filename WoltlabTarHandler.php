@@ -1,4 +1,4 @@
-<?php
+\<?php
 WoltlabTarHandler::execute(getopt("", array(
 	"upload"
 )));
@@ -8,13 +8,12 @@ class WoltlabTarHandler{
 	const IS_EXACTLY = "isExactly";
 
 	private static $_subFoldersToTar = array("files", "templates", "acpTemplates"); // Relative to baseDir
-	private static $_subDirectoriesToInclude = array("language"); // Must be flat directories relative to baseDir
+	private static $_subDirectoriesToInclude = array("language", "optionals", "requirements", "sql", "xml"); // Must be flat directories relative to baseDir
 	private static $_filesToInclude = array( // Relative to baseDir
 		array(self::ENDS_WITH => ".xml"),
-		array(self::IS_EXACTLY => "files.tar"),
-		array(self::IS_EXACTLY => "templates.tar"),
-		array(self::IS_EXACTLY => "install.sql"),
-		array(self::IS_EXACTLY => "update.sql"),
+		array(self::ENDS_WITH => ".tar"),
+		array(self::ENDS_WITH => ".sql"),
+		array(self::ENDS_WITH => ".php")
 	);
 	private static $_baseDir;
 	private static $_packageName;
@@ -25,9 +24,9 @@ class WoltlabTarHandler{
 	private static $_packageServerSSHUsername = "ubuntu";
 	private static $_packageServerSSHPassword = "";
 	// Use this for PEM authentication (such as AWS) -- it'll require this script to be run as root
-	private static $_packageServerSSHPemFileLocation = "/home/ubuntu/.ssh/wcf-package-server.pem";
-	private static $_packageServerHostname = "wcfpackages.dynamogeek.com";
-	private static $_packageServerPackageDirectory = "/var/www/node/Tims-PackageServer/packages/";
+	private static $_packageServerSSHPemFileLocation = "";
+	private static $_packageServerHostname = "";
+	private static $_packageServerPackageDirectory = "";
 
 
 	/* Don't modify anything below this line */
@@ -83,18 +82,23 @@ class WoltlabTarHandler{
 			echo "Created " . self::$_packageName . ".tar...\n";
 		}
 		foreach(self::$_subFoldersToTar as $folderToTar){
-			if(!is_dir($folderToTar)){
+			if(!is_dir($folderToTar) && !is_dir("tar" . DIRECTORY_SEPARATOR . $folderToTar)){
 				continue;
 			}
+			$subDirTar = "";
+			if(is_dir("tar" . DIRECTORY_SEPARATOR . $folderToTar)){
+				$subDirTar = "tar" . DIRECTORY_SEPARATOR;
+			    chdir("tar");
+            }
 			chdir($folderToTar);
 			$subtar = new PharData("$folderToTar.tar");
 			if(self::$_beVerbose){
-				echo "Created $folderToTar.tar...\n";
+				echo "Created $subDirTar$folderToTar.tar...\n";
 			}
 			$subtar->buildFromDirectory("../$folderToTar", "/.*(?<!.tar)$/");
 
 			if(self::$_beVerbose){
-				echo "Added all sub-directories of $folderToTar/ to $folderToTar.tar...\n";
+				echo "Added all sub-directories of $subDirTar$folderToTar/ to $subDirTar$folderToTar.tar...\n";
 			}
 			foreach(scandir("." . DIRECTORY_SEPARATOR) as $itemInDir){
 				if(strpos($itemInDir, ".") === 0){
@@ -104,13 +108,16 @@ class WoltlabTarHandler{
 				if(is_file($itemInDir) && substr($itemInDir, -4) !== ".tar"){
 					$subtar->addFile($itemInDir);
 					if(self::$_beVerbose){
-						echo "Added $itemInDir to $folderToTar.tar...\n";
+						echo "Added $itemInDir to $subDirTar$folderToTar.tar...\n";
 					}
 				}
 			}
 			rename("$folderToTar.tar", ".." . DIRECTORY_SEPARATOR . "$folderToTar.tar");
 			chdir(".." . DIRECTORY_SEPARATOR);
 			$tar->addFile("$folderToTar.tar");
+			if(!empty($subDirTar)){
+				chdir(".." . DIRECTORY_SEPARATOR);
+			}
 		}
 		foreach(self::$_subDirectoriesToInclude as $subDirectoryToInclude){
 			if(is_dir($subDirectoryToInclude)){
@@ -127,7 +134,7 @@ class WoltlabTarHandler{
 			}
 		}
 		foreach(scandir(self::$_baseDir) as $possibleFileToInclude){
-			if(strpos($possibleFileToInclude, ".") === 0){
+			if(strpos($possibleFileToInclude, ".") === 0 || $possibleFileToInclude === self::$_packageName . ".tar"){
 				// Skip ".", "..", and all hidden files
 				continue;
 			}
