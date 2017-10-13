@@ -8,7 +8,7 @@ class WoltlabTarHandler{
 	const IS_EXACTLY = "isExactly";
 
 	private static $_subFoldersToTar = array("files", "templates", "acpTemplates"); // Relative to baseDir
-	private static $_subDirectoriesToInclude = array("language", "optionals", "requirements", "sql", "xml"); // Must be flat directories relative to baseDir
+	private static $_subDirectoriesToInclude = array("tar", "language", "optionals", "requirements", "sql", "xml"); // Must be flat directories relative to baseDir
 	private static $_filesToInclude = array( // Relative to baseDir
 		array(self::ENDS_WITH => ".xml"),
 		array(self::ENDS_WITH => ".tar"),
@@ -114,19 +114,21 @@ class WoltlabTarHandler{
 			}
 			rename("$folderToTar.tar", ".." . DIRECTORY_SEPARATOR . "$folderToTar.tar");
 			chdir(".." . DIRECTORY_SEPARATOR);
-			$tar->addFile("$folderToTar.tar");
 			if(!empty($subDirTar)){
 				chdir(".." . DIRECTORY_SEPARATOR);
+			}else{
+				$tar->addFile("$folderToTar.tar");
 			}
 		}
 		foreach(self::$_subDirectoriesToInclude as $subDirectoryToInclude){
 			if(is_dir($subDirectoryToInclude)){
 				foreach(scandir($subDirectoryToInclude) as $fileToInclude){
-					if(strpos($fileToInclude, ".") === 0){
-						// Skip ".", "..", and all hidden files
+				    $fullFileName = $subDirectoryToInclude . DIRECTORY_SEPARATOR . $fileToInclude;
+					if(substr($fileToInclude, 0, 1) === "." || !is_file($fullFileName)){
+						// Skip ".", "..", hidden files, and directories
 						continue;
 					}
-					$tar->addFile($subDirectoryToInclude . DIRECTORY_SEPARATOR . $fileToInclude);
+					$tar->addFile($fullFileName);
 					if(self::$_beVerbose){
 						echo "Added $fileToInclude to sub-directory $subDirectoryToInclude...\n";
 					}
